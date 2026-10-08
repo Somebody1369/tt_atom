@@ -72,7 +72,8 @@ try:
         data['product_code'] = None
 
     try:
-        data['reviews_count'] = int(driver.find_element(By.XPATH, "//a[contains(@class, 'reviews-count')]/span").get_attribute('textContent').strip())
+        # Only the current product's counter: the series counters are in series-comments-block
+        data['reviews_count'] = int(driver.find_element(By.XPATH, "//div[@id='fast-navigation-block-static']//div[contains(@class, 'main-comments-block')]//a[contains(@class, 'reviews-count')]/span").get_attribute('textContent').strip())
     except (NoSuchElementException, ValueError):
         data['reviews_count'] = None
 

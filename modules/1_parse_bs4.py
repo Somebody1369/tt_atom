@@ -46,7 +46,9 @@ if response.status_code == 200:
         data['product_code'] = None
 
     try:
-        data['reviews_count'] = int(soup.find('a', attrs={'class': 'reviews-count'}).find('span').text.strip())
+        # Only the current product's counter: the series counters are in series-comments-block
+        reviews_block = soup.find('div', attrs={'id': 'fast-navigation-block-static'}).find('div', attrs={'class': 'main-comments-block'})
+        data['reviews_count'] = int(reviews_block.find('a', attrs={'class': 'reviews-count'}).find('span').text.strip())
     except (AttributeError, ValueError):
         data['reviews_count'] = None
 

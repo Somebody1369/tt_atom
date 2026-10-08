@@ -77,7 +77,8 @@ with sync_playwright() as p:
         data['product_code'] = None
 
     try:
-        data['reviews_count'] = int(get_text(page.locator("xpath=//a[contains(@class, 'reviews-count')]/span")))
+        # Only the current product's counter: the series counters are in series-comments-block
+        data['reviews_count'] = int(get_text(page.locator("xpath=//div[@id='fast-navigation-block-static']//div[contains(@class, 'main-comments-block')]//a[contains(@class, 'reviews-count')]/span")))
     except (PlaywrightTimeoutError, ValueError):
         data['reviews_count'] = None
 
