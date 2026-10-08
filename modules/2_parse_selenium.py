@@ -2,12 +2,15 @@
 Search a product on brain.com.ua with Selenium, open the first result, parse its page and save it to DB
 """
 import os
+import re
 from pprint import pprint
 
 from load_django import *
 from parser_app.models import *
-from selenium import webdriver
+import certifi
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.selenium_manager import SeleniumManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
@@ -16,14 +19,34 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 SEARCH_QUERY = 'Apple iPhone 15 128GB Black'
 
-# Chrome profile keeps cookies, so the Cloudflare check has to be passed manually only once
+# Chrome profile keeps cookies between runs
 PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chrome_profile')
 
-options = webdriver.ChromeOptions()
-options.add_argument(f'--user-data-dir={PROFILE_DIR}')
-options.add_argument('--disable-blink-features=AutomationControlled')
+# Debug screenshots are saved to the project's files folder
+FILES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'files'))
 
-driver = webdriver.Chrome(options=options)
+
+def get_chrome_major_version():
+    """Return the major version of the installed Google Chrome, or None if it is not found"""
+    # Selenium Manager picks a chromedriver for the installed Chrome, the driver version is in its path
+    driver_path = SeleniumManager().binary_paths(['--browser', 'chrome'])['driver_path']
+    version = re.search(r'(\d+)\.\d+\.\d+\.\d+', driver_path)
+    return int(version.group(1)) if version else None
+
+
+# undetected_chromedriver downloads chromedriver with urllib; python.org builds of Python on macOS
+# have no root certificates, so the certifi bundle is used
+os.environ.setdefault('SSL_CERT_FILE', certifi.where())
+
+# undetected_chromedriver calls quit() again in __del__ when Python shuts down and prints a traceback;
+# quit() is already called in finally, so the destructor is disabled
+uc.Chrome.__del__ = lambda self: None
+
+options = uc.ChromeOptions()
+options.add_argument(f'--user-data-dir={PROFILE_DIR}')
+
+# undetected_chromedriver hides automation flags, so Cloudflare lets the browser in without manual actions
+driver = uc.Chrome(options=options, version_main=get_chrome_major_version())
 driver.maximize_window()
 
 step = 'open main page'
@@ -102,12 +125,10 @@ try:
         data['price'] = current_price
         data['sale_price'] = None
 
-    try:
-        photos = driver.find_elements(By.XPATH, "//div[contains(@class, 'br-image-links')]//img[@class='br-main-img']")
-        # dict.fromkeys() removes duplicates if the slider clones slides
-        data['photos'] = list(dict.fromkeys(img.get_attribute('src') for img in photos)) or None
-    except NoSuchElementException:
-        data['photos'] = None
+    # find_elements() does not raise NoSuchElementException, it returns an empty list
+    photos = driver.find_elements(By.XPATH, "//div[contains(@class, 'br-image-links')]//img[@class='br-main-img']")
+    # dict.fromkeys() removes duplicates if the slider clones slides
+    data['photos'] = list(dict.fromkeys(img.get_attribute('src') for img in photos)) or None
 
     # Characteristics table: every row is <div><span>label</span><span>value</span></div>
     try:
@@ -150,7 +171,7 @@ try:
                 continue
             # split() + join() removes non-breaking spaces and extra whitespace inside the value
             characteristics[label.get_attribute('textContent').strip()] = ' '.join(value.get_attribute('textContent').split())
-        data['characteristics'] = characteristics
+        data['characteristics'] = characteristics or None
     except AttributeError:
         data['characteristics'] = None
 
@@ -162,7 +183,8 @@ try:
     product, created = Product.objects.get_or_create(**data)
     print(f'Saved to DB: id={product.id}, created={created}')
 except TimeoutException:
-    screenshot_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'selenium_debug.png')
+    os.makedirs(FILES_DIR, exist_ok=True)
+    screenshot_path = os.path.join(FILES_DIR, 'selenium_debug.png')
     driver.save_screenshot(screenshot_path)
     print(f'Timeout on step: {step}')
     print(f'Page title: {driver.title}')

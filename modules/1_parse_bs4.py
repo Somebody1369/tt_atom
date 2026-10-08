@@ -1,6 +1,7 @@
 """
 Parse one brain.com.ua product page with Requests + BeautifulSoup and save it to DB
 """
+import sys
 from pprint import pprint
 
 from load_django import *
@@ -27,7 +28,11 @@ headers = {
 
 url = 'https://brain.com.ua/ukr/Mobilniy_telefon_Apple_iPhone_16_Pro_Max_256GB_Black_Titanium-p1145443.html'
 
-response = requests.get(url, headers=headers)
+try:
+    response = requests.get(url, headers=headers, timeout=30)
+except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, requests.exceptions.TooManyRedirects) as error:
+    print(f'Request error: {error}')
+    sys.exit(1)
 
 if response.status_code == 200:
     print('Success!')
@@ -76,7 +81,7 @@ if response.status_code == 200:
 
     try:
         gallery = soup.find('div', attrs={'class': 'br-image-links'})
-        data['photos'] = [img.get('src') for img in gallery.find_all('img', attrs={'class': 'br-main-img'})]
+        data['photos'] = [img.get('src') for img in gallery.find_all('img', attrs={'class': 'br-main-img'})] or None
     except AttributeError:
         data['photos'] = None
 
@@ -117,7 +122,7 @@ if response.status_code == 200:
                 if label and value:
                     # split() + join() removes non-breaking spaces and extra whitespace inside the value
                     characteristics[label.get_text(strip=True)] = ' '.join(value.get_text().split())
-        data['characteristics'] = characteristics
+        data['characteristics'] = characteristics or None
     except AttributeError:
         data['characteristics'] = None
 

@@ -1,3 +1,6 @@
+"""
+Set up Django so that scripts from the modules folder can use the braincomua_project models
+"""
 import os
 import sys
 import django
