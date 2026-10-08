@@ -1,11 +1,10 @@
 """
 Search a product on brain.com.ua with Playwright, open the first result, parse its page and save it to DB
 """
-import os
-from pprint import pprint
-
 from load_django import *
 from parser_app.models import *
+import os
+from pprint import pprint
 from playwright.sync_api import sync_playwright, Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
 
 SEARCH_QUERY = 'Apple iPhone 15 128GB Black'
@@ -34,15 +33,17 @@ def get_price(price_block, xpath):
 data = {}
 
 with sync_playwright() as p:
-    # One browser for the whole script; real Chrome as in the employer's async_playwright_example.py
-    browser = p.chromium.launch_persistent_context(
+    # One browser for the whole script; channel='chrome' runs the installed Google Chrome instead of bundled Chromium.
+    # launch_persistent_context() starts the browser with the saved profile and returns its context
+    context = p.chromium.launch_persistent_context(
         PROFILE_DIR,
         channel='chrome',
         headless=False,
         viewport={'width': 1400, 'height': 900},
         args=['--disable-blink-features=AutomationControlled'],
     )
-    page = browser.pages[0] if browser.pages else browser.new_page()
+    # A persistent context opens with one blank tab: reuse it instead of opening a second one
+    page = context.pages[0] if context.pages else context.new_page()
 
     step = 'open main page'
     try:
@@ -168,10 +169,16 @@ with sync_playwright() as p:
         print(f'Playwright error on step: {step}: {error}')
         data = {}
     finally:
-        browser.close()
+        context.close()
 
 if data:
     pprint(data)
+
+    # In a JSONField lookup characteristics=None means JSON null, not an empty field,
+    # so get_or_create would not find the saved record and would create a duplicate
+    if data['characteristics'] is None:
+        del data['characteristics']
+        data['characteristics__isnull'] = True
 
     # Django ORM is called after Playwright is closed: inside sync_playwright an event loop is running
     # and Django raises SynchronousOnlyOperation there

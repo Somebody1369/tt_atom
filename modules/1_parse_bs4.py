@@ -1,11 +1,10 @@
 """
 Parse one brain.com.ua product page with Requests + BeautifulSoup and save it to DB
 """
-import sys
-from pprint import pprint
-
 from load_django import *
 from parser_app.models import *
+import sys
+from pprint import pprint
 import requests
 from bs4 import BeautifulSoup
 
@@ -130,6 +129,12 @@ if response.status_code == 200:
     data['source'] = 'bs4'
 
     pprint(data)
+
+    # In a JSONField lookup characteristics=None means JSON null, not an empty field,
+    # so get_or_create would not find the saved record and would create a duplicate
+    if data['characteristics'] is None:
+        del data['characteristics']
+        data['characteristics__isnull'] = True
 
     product, created = Product.objects.get_or_create(**data)
     print(f'Saved to DB: id={product.id}, created={created}')

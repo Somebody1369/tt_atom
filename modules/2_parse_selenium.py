@@ -1,12 +1,11 @@
 """
 Search a product on brain.com.ua with Selenium, open the first result, parse its page and save it to DB
 """
+from load_django import *
+from parser_app.models import *
 import os
 import re
 from pprint import pprint
-
-from load_django import *
-from parser_app.models import *
 import certifi
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
@@ -179,6 +178,12 @@ try:
     data['source'] = 'selenium'
 
     pprint(data)
+
+    # In a JSONField lookup characteristics=None means JSON null, not an empty field,
+    # so get_or_create would not find the saved record and would create a duplicate
+    if data['characteristics'] is None:
+        del data['characteristics']
+        data['characteristics__isnull'] = True
 
     product, created = Product.objects.get_or_create(**data)
     print(f'Saved to DB: id={product.id}, created={created}')
