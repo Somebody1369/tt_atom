@@ -2,3 +2,6 @@ braincomua-env/
 __pycache__/
 *.pyc
 .DS_Store
+modules/chrome_profile/
+modules/selenium_debug.png
+modules/playwright_profile/
